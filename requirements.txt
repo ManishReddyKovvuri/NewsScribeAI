@@ -1,0 +1,15 @@
+#core requirements
+python-dotenv==1.0.0
+langchain==0.3.23
+langchain-community==0.3.21
+langchain-core==0.3.51
+groq==0.22.0 
+langchain-groq==0.3.2
+langgraph==0.3.30
+ipython==9.1.0
+pydantic==2.11.3
+requests==2.32.3
+openai==1.74.0
+
+
+
