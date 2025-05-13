@@ -12,8 +12,10 @@ from langchain_groq import ChatGroq
 from langgraph.checkpoint.memory import MemorySaver
 from dotenv import load_dotenv
 load_dotenv()
- 
-
+import openai
+from io import BytesIO
+from langchain.tools import tool
+import requests
 
 
 news_tool = TavilySearchResults(max_results=2)
@@ -58,9 +60,50 @@ def chatbot(state: State):
     full_messages = [SystemMessage(content=system_msg), *state["messages"]]
     return {"messages": [llm_with_tools.invoke(full_messages)]}
 
+
+
+def generate_and_save_image(prompt, image_path):
+    """Generates an image using the OpenAI API and saves it to the specified path."""
+    try:
+        response = openai.images.generate(
+            model="dall-e-3",
+            prompt=prompt,
+            n=1,
+            size="1024x1024",
+            response_format="url"
+        )
+        image_url = response.data[0].url
+
+        # Download and save the image
+        image_data = requests.get(image_url).content
+        img = Image.open(BytesIO(image_data))
+        img.save(image_path)
+
+        print(f"Image saved successfully at {image_path}")
+    except Exception as e:
+        print(f"Error generating or saving image: {e}")
+
+
+
+
+@tool
+def ImageGenerator(prompt: str) -> str:
+    """Generates an image from a text prompt using DALL·E or another model."""
+    # Call OpenAI or Replicate here
+    return f"https://fake.url/image-for-{prompt.replace(' ', '-')}.png"
+
+
+
+
+
+
 graph_builder = StateGraph(State)
 
 graph_builder.add_node("chatbot", chatbot)
+
+graph_builder.add_node("ImageGenerator", generate_and_save_image)
+
+
 
 tool_node = ToolNode(tools=tools)
 graph_builder.add_node("tools", tool_node)
@@ -73,8 +116,10 @@ graph_builder.add_conditional_edges(
 )
 # Any time a tool is called, we return to the chatbot to decide the next step
 graph_builder.add_edge("tools", "chatbot")
+# graph_builder.add_conditional_edges("chatbot", "ImageGenerator")
+graph_builder.add_edge("ImageGenerator", END)
 graph_builder.add_edge(START, "chatbot")
-graph_builder.add_edge("chatbot", END)
+
 
 memory = MemorySaver()
 
@@ -85,6 +130,9 @@ from IPython.display import Image, display
 
 try:
     display(Image(graph.get_graph().draw_mermaid_png()))
+    with open("graph_image.png", "wb") as file:
+        file.write(graph.get_graph().draw_mermaid_png())
+
 except Exception:
     # This requires some extra dependencies and is optional
     pass
@@ -107,6 +155,7 @@ def stream_graph_updates(user_input: str, config: dict = {}):
         for message in event.get("messages", []):
             if hasattr(message, "pretty_print"):
                 message.pretty_print()
+                
             else:
                 print("Assistant:", message.get("content", "[No content]"))
 
