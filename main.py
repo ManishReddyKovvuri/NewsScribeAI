@@ -93,6 +93,15 @@ def ImageGenerator(prompt: str) -> str:
     return f"https://fake.url/image-for-{prompt.replace(' ', '-')}.png"
 
 
+import asyncio
+from langchain_community.agent_toolkits import PlayWrightBrowserToolkit
+from playwright.async_api import async_playwright
+# This should be inside an async context or loop
+async def init_playwright_tools():
+    p = await async_playwright().start()
+    browser = await p.chromium.launch(headless=True)
+    toolkit = PlayWrightBrowserToolkit.from_browser(async_browser=browser)
+    return toolkit.get_tools()
 
 
 
@@ -114,16 +123,13 @@ graph_builder.add_conditional_edges(
     "chatbot",
     tools_condition,
 )
-# Any time a tool is called, we return to the chatbot to decide the next step
 graph_builder.add_edge("tools", "chatbot")
-# graph_builder.add_conditional_edges("chatbot", "ImageGenerator")
+
 graph_builder.add_edge("ImageGenerator", END)
 graph_builder.add_edge(START, "chatbot")
 
 
 memory = MemorySaver()
-
-# graph = graph_builder.compile()
 graph = graph_builder.compile(checkpointer=memory)
 
 from IPython.display import Image, display
@@ -134,10 +140,8 @@ try:
         file.write(graph.get_graph().draw_mermaid_png())
 
 except Exception:
-    # This requires some extra dependencies and is optional
     pass
 
-# config = {"configurable": {"thread_id": "1"}}
 
 
 
